@@ -22,11 +22,14 @@ please run the daemon:
 `
 
 type WorkOutput struct {
-	RepoSize     uint64
-	NumObjects   uint64
-	SendDataSize uint64
-	Score        uint64
+	RepoSize          uint64
+	DeltaRepoSize     int64
+	SendDataSize      uint64
+	DeltaSendDataSize int64
+	Score             int64
 }
+
+var oldWorkOutput *WorkOutput
 
 var WorkCmd = &cmds.Command{
 	Helptext: cmds.HelpText{
@@ -37,10 +40,11 @@ Prints out information about the specified peer.
 EXAMPLE:
 	ipfs work
 Output:
-	RepoSize        int Size in bytes that the repo is currently taking.
-	NumObjects      int Number of objects in the local repo.
-	SendDataSize    int Size in bytes that the node upload.
-	Score           int workload score
+	RepoSize           uint64 Size in bytes that the repo is currently taking.
+	DeltaRepoSize      int64  Size in bytes that the change of repo size
+	SendDataSize       uint64 Size in bytes that the node upload.
+	DeltaSendDataSize  int64  Size in bytes that the change of send data size
+	Score              int64  Workload score = RepoSize + 5 * (DeltaRepoSize + DeltaSendDataSize)
 `,
 	},
 	Run: func(req *cmds.Request, res cmds.ResponseEmitter, env cmds.Environment) error {
@@ -69,23 +73,37 @@ Output:
 			return err
 		}
 
-		return cmds.EmitOnce(res, WorkOutput{
-			RepoSize:     repoStat.RepoSize,
-			NumObjects:   repoStat.NumObjects,
-			SendDataSize: bitswapStat.DataSent,
-			Score:        5*repoStat.RepoSize + bitswapStat.DataSent,
+		if oldWorkOutput == nil {
+			oldWorkOutput = &WorkOutput{
+				RepoSize:          repoStat.RepoSize,
+				DeltaRepoSize:     0,
+				SendDataSize:      bitswapStat.DataSent,
+				DeltaSendDataSize: 0,
+				Score:             int64(repoStat.RepoSize),
+			}
+
+			return cmds.EmitOnce(res, oldWorkOutput)
+		}
+
+		return cmds.EmitOnce(res, &WorkOutput{
+			RepoSize:          repoStat.RepoSize,
+			DeltaRepoSize:     0,
+			SendDataSize:      bitswapStat.DataSent,
+			DeltaSendDataSize: 0,
+			Score:             int64(repoStat.RepoSize),
 		})
 	},
-	Type: WorkOutput{},
+	Type: &WorkOutput{},
 	Encoders: cmds.EncoderMap{
 		cmds.Text: cmds.MakeTypedEncoder(func(req *cmds.Request, w io.Writer, out *WorkOutput) error {
 			wtr := tabwriter.NewWriter(w, 0, 0, 1, ' ', 0)
 			defer wtr.Flush()
 
-			fmt.Fprintf(wtr, "%s:\t%d\n", "RepoSize", &out.RepoSize)
-			fmt.Fprintf(wtr, "%s:\t%d\n", "NumObjects", &out.NumObjects)
-			fmt.Fprintf(wtr, "%s:\t%d\n", "SendDataSize", &out.SendDataSize)
-			fmt.Fprintf(wtr, "%s:\t%d\n", "Score", &out.Score)
+			fmt.Fprintf(wtr, "%s:\t%d\n", "RepoSize", out.RepoSize)
+			fmt.Fprintf(wtr, "%s:\t%d\n", "DeltaRepoSize", out.DeltaRepoSize)
+			fmt.Fprintf(wtr, "%s:\t%d\n", "SendDataSize", out.SendDataSize)
+			fmt.Fprintf(wtr, "%s:\t%d\n", "DeltaSendDataSize", out.DeltaSendDataSize)
+			fmt.Fprintf(wtr, "%s:\t%d\n", "Score", out.Score)
 			return nil
 		}),
 	},
