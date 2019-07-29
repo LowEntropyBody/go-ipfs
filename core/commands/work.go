@@ -69,14 +69,14 @@ Output:
 			return err
 		}
 
-		return cmds.EmitOnce(res, &WorkOutput{
+		return cmds.EmitOnce(res, WorkOutput{
 			RepoSize:     repoStat.RepoSize,
 			NumObjects:   repoStat.NumObjects,
 			SendDataSize: bitswapStat.DataSent,
 			Score:        5*repoStat.RepoSize + bitswapStat.DataSent,
 		})
 	},
-	Type: &WorkOutput{},
+	Type: WorkOutput{},
 	Encoders: cmds.EncoderMap{
 		cmds.Text: cmds.MakeTypedEncoder(func(req *cmds.Request, w io.Writer, out *WorkOutput) error {
 			wtr := tabwriter.NewWriter(w, 0, 0, 1, ' ', 0)
