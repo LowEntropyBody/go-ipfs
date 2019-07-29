@@ -22,9 +22,9 @@ please run the daemon:
 `
 
 type WorkOutput struct {
-	RepoSize          uint64
+	RepoSize          int64
 	DeltaRepoSize     int64
-	SendDataSize      uint64
+	SendDataSize      int64
 	DeltaSendDataSize int64
 	Score             int64
 }
@@ -40,11 +40,11 @@ Prints out information about the specified peer.
 EXAMPLE:
 	ipfs work
 Output:
-	RepoSize           uint64 Size in bytes that the repo is currently taking.
-	DeltaRepoSize      int64  Size in bytes that the change of repo size
-	SendDataSize       uint64 Size in bytes that the node upload.
-	DeltaSendDataSize  int64  Size in bytes that the change of send data size
-	Score              int64  Workload score = RepoSize + 5 * (DeltaRepoSize + DeltaSendDataSize)
+	RepoSize           int Size in bytes that the repo is currently taking.
+	DeltaRepoSize      int Size in bytes that the change of repo size
+	SendDataSize       int Size in bytes that the node upload.
+	DeltaSendDataSize  int Size in bytes that the change of send data size
+	Score              int Workload score = RepoSize + 5 * (DeltaRepoSize + DeltaSendDataSize)
 `,
 	},
 	Run: func(req *cmds.Request, res cmds.ResponseEmitter, env cmds.Environment) error {
@@ -75,9 +75,9 @@ Output:
 
 		if oldWorkOutput == nil {
 			oldWorkOutput = &WorkOutput{
-				RepoSize:          repoStat.RepoSize,
+				RepoSize:          int64(repoStat.RepoSize),
 				DeltaRepoSize:     0,
-				SendDataSize:      bitswapStat.DataSent,
+				SendDataSize:      int64(bitswapStat.DataSent),
 				DeltaSendDataSize: 0,
 				Score:             int64(repoStat.RepoSize),
 			}
@@ -85,13 +85,16 @@ Output:
 			return cmds.EmitOnce(res, oldWorkOutput)
 		}
 
-		return cmds.EmitOnce(res, &WorkOutput{
-			RepoSize:          repoStat.RepoSize,
-			DeltaRepoSize:     0,
-			SendDataSize:      bitswapStat.DataSent,
-			DeltaSendDataSize: 0,
-			Score:             int64(repoStat.RepoSize),
-		})
+		newWorkOutput := &WorkOutput{
+			RepoSize:          int64(repoStat.RepoSize),
+			DeltaRepoSize:     int64(repoStat.RepoSize) - oldWorkOutput.RepoSize,
+			SendDataSize:      int64(bitswapStat.DataSent),
+			DeltaSendDataSize: int64(bitswapStat.DataSent) - oldWorkOutput.SendDataSize,
+			Score:             int64(repoStat.RepoSize) + 5*((int64(repoStat.RepoSize)-oldWorkOutput.RepoSize)+(int64(bitswapStat.DataSent)-oldWorkOutput.SendDataSize)),
+		}
+
+		oldWorkOutput = newWorkOutput
+		return cmds.EmitOnce(res, newWorkOutput)
 	},
 	Type: &WorkOutput{},
 	Encoders: cmds.EncoderMap{
