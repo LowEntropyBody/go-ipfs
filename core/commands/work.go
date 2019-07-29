@@ -35,8 +35,6 @@ var WorkCmd = &cmds.Command{
 	Helptext: cmds.HelpText{
 		Tagline: "Show ipfs node workload info.",
 		ShortDescription: `
-Prints out information about the specified peer.
-
 EXAMPLE:
 	ipfs work
 Output:
