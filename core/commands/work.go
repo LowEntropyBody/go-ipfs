@@ -6,8 +6,10 @@ import (
 	"io"
 	"text/tabwriter"
 
+	bitswap "github.com/ipfs/go-bitswap"
 	cmds "github.com/ipfs/go-ipfs-cmds"
 	"github.com/ipfs/go-ipfs/core/commands/cmdenv"
+	e "github.com/ipfs/go-ipfs/core/commands/e"
 	corerepo "github.com/ipfs/go-ipfs/core/corerepo"
 )
 
@@ -51,7 +53,18 @@ Output:
 			return errors.New(offlineWorkErrorMessage)
 		}
 
+		// Repo info
 		repoStat, err := corerepo.RepoStat(req.Context, n)
+		if err != nil {
+			return err
+		}
+
+		bs, ok := n.Exchange.(*bitswap.Bitswap)
+		if !ok {
+			return e.TypeErr(bs, n.Exchange)
+		}
+
+		bitswapStat, err := bs.Stat()
 		if err != nil {
 			return err
 		}
@@ -59,11 +72,11 @@ Output:
 		return cmds.EmitOnce(res, &WorkOutput{
 			RepoSize:     repoStat.RepoSize,
 			NumObjects:   repoStat.NumObjects,
-			SendDataSize: 0,
-			Score:        repoStat.RepoSize + 0,
+			SendDataSize: bitswapStat.DataSent,
+			Score:        5*repoStat.RepoSize + bitswapStat.DataSent,
 		})
 	},
-	Type: WorkOutput{},
+	Type: &WorkOutput{},
 	Encoders: cmds.EncoderMap{
 		cmds.Text: cmds.MakeTypedEncoder(func(req *cmds.Request, w io.Writer, out *WorkOutput) error {
 			wtr := tabwriter.NewWriter(w, 0, 0, 1, ' ', 0)
