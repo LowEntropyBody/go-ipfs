@@ -21,11 +21,11 @@ please run the daemon:
     ipfs work
 `
 
-type Node struct {
-	Hash  string
-	Size  int64
-	Nodes []Node
-	Data  string
+type BlockNode struct {
+	Hash       string
+	Size       int64
+	BlockNodes []BlockNode
+	Data       string
 }
 
 type WorkOutput struct {
@@ -33,8 +33,8 @@ type WorkOutput struct {
 	DeltaRepoSize     int64
 	SendDataSize      int64
 	DeltaSendDataSize int64
+	FileRootNodes     []BlockNode
 	WorkLoad          int64
-	Files             []Node
 }
 
 var oldWorkOutput *WorkOutput
@@ -50,11 +50,12 @@ Output:
 	DeltaRepoSize      int Size in bytes that the change of repo size
 	SendDataSize       int Size in bytes that the node upload.
 	DeltaSendDataSize  int Size in bytes that the change of send data size
-	Files              File root node collection
+	FileRootNodes      File root node collection
 	WorkLoad           int Workload score = RepoSize + 5 * (DeltaRepoSize + DeltaSendDataSize)
 `,
 	},
 	Run: func(req *cmds.Request, res cmds.ResponseEmitter, env cmds.Environment) error {
+		// Get node
 		n, err := cmdenv.GetNode(env)
 		if err != nil {
 			return err
@@ -70,6 +71,7 @@ Output:
 			return err
 		}
 
+		// Bitswap info
 		bs, ok := n.Exchange.(*bitswap.Bitswap)
 		if !ok {
 			return e.TypeErr(bs, n.Exchange)
@@ -80,6 +82,7 @@ Output:
 			return err
 		}
 
+		// Output
 		if oldWorkOutput == nil {
 			oldWorkOutput = &WorkOutput{
 				RepoSize:          int64(repoStat.RepoSize),
