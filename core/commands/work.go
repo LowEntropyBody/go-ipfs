@@ -99,6 +99,7 @@ Output:
 				DeltaRepoSize:     0,
 				SendDataSize:      int64(bitswapStat.DataSent),
 				DeltaSendDataSize: 0,
+				FileRootNodes:     fileRootNodes,
 				WorkLoad:          int64(repoStat.RepoSize),
 			}
 
@@ -110,6 +111,7 @@ Output:
 			DeltaRepoSize:     int64(repoStat.RepoSize) - oldWorkOutput.RepoSize,
 			SendDataSize:      int64(bitswapStat.DataSent),
 			DeltaSendDataSize: int64(bitswapStat.DataSent) - oldWorkOutput.SendDataSize,
+			FileRootNodes:     fileRootNodes,
 			WorkLoad:          int64(repoStat.RepoSize) + 5*((int64(repoStat.RepoSize)-oldWorkOutput.RepoSize)+(int64(bitswapStat.DataSent)-oldWorkOutput.SendDataSize)),
 		}
 
