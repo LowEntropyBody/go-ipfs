@@ -82,6 +82,16 @@ Output:
 			return err
 		}
 
+		// Get file root nodes
+		var fileRootNodes []BlockNode
+		for _, c := range n.Pinning.RecursiveKeys() {
+			fileRootNode := &BlockNode{
+				Hash: c.String(),
+			}
+
+			fileRootNodes = append(fileRootNodes, *fileRootNode)
+		}
+
 		// Output
 		if oldWorkOutput == nil {
 			oldWorkOutput = &WorkOutput{
