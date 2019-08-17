@@ -89,6 +89,12 @@ Output:
 				Hash: c.String(),
 			}
 
+			err = recursiveFillNode(fileRootNode)
+
+			if err != nil {
+				return err
+			}
+
 			fileRootNodes = append(fileRootNodes, *fileRootNode)
 		}
 
@@ -132,4 +138,8 @@ Output:
 			return nil
 		}),
 	},
+}
+
+func recursiveFillNode(node *BlockNode) error {
+	return nil
 }
