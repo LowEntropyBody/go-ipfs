@@ -4,6 +4,7 @@ import (
 	"errors"
 	"fmt"
 	"io"
+	"io/ioutil"
 	"text/tabwriter"
 
 	bitswap "github.com/ipfs/go-bitswap"
@@ -162,6 +163,22 @@ func recursiveFillNode(node *BlockNode, api coreiface.CoreAPI, req *cmds.Request
 		return err
 	}
 
+	if len(links) == 0 {
+		return nil
+	}
+
+	dataIO, err := api.Object().Data(req.Context, path)
+	if err != nil {
+		return err
+	}
+
+	data, err := ioutil.ReadAll(dataIO)
+	if err != nil {
+		return err
+	}
+
+	node.Data = string(data)
+
 	blockNodes := make([]BlockNode, len(links))
 
 	for i, link := range links {
@@ -169,8 +186,12 @@ func recursiveFillNode(node *BlockNode, api coreiface.CoreAPI, req *cmds.Request
 			Hash: link.Cid.String(),
 		}
 
+		recursiveFillNode(&blockNode, api, req)
+
 		blockNodes[i] = blockNode
 	}
+
+	node.BlockNodes = blockNodes
 
 	return nil
 }
