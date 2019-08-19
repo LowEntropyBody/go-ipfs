@@ -1,6 +1,7 @@
 package commands
 
 import (
+	"encoding/json"
 	"errors"
 	"fmt"
 	"io"
@@ -140,11 +141,12 @@ Output:
 			wtr := tabwriter.NewWriter(w, 0, 0, 1, ' ', 0)
 			defer wtr.Flush()
 
-			fmt.Fprintf(wtr, "%s:\t%d\n", "RepoSize", out.RepoSize)
-			fmt.Fprintf(wtr, "%s:\t%d\n", "DeltaRepoSize", out.DeltaRepoSize)
-			fmt.Fprintf(wtr, "%s:\t%d\n", "SendDataSize", out.SendDataSize)
-			fmt.Fprintf(wtr, "%s:\t%d\n", "DeltaSendDataSize", out.DeltaSendDataSize)
-			fmt.Fprintf(wtr, "%s:\t%d\n", "Score", out.WorkLoad)
+			outString, err := json.Marshal(*out)
+			if err != nil {
+				return err
+			}
+
+			fmt.Fprintf(wtr, "%s\n", outString)
 			return nil
 		}),
 	},
