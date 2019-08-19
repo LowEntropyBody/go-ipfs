@@ -11,6 +11,8 @@ import (
 	"github.com/ipfs/go-ipfs/core/commands/cmdenv"
 	e "github.com/ipfs/go-ipfs/core/commands/e"
 	corerepo "github.com/ipfs/go-ipfs/core/corerepo"
+	coreiface "github.com/ipfs/interface-go-ipfs-core"
+	path "github.com/ipfs/interface-go-ipfs-core/path"
 )
 
 const offlineWorkErrorMessage = `'ipfs work' currently cannot query information without a running daemon; we are working to fix this.
@@ -51,7 +53,7 @@ Output:
 	SendDataSize       int Size in bytes that the node upload.
 	DeltaSendDataSize  int Size in bytes that the change of send data size
 	FileRootNodes      File root node collection
-	WorkLoad           int Workload score = RepoSize + 5 * (DeltaRepoSize + DeltaSendDataSize)
+	WorkLoad           int Workload score = sum(Files size)
 `,
 	},
 	Run: func(req *cmds.Request, res cmds.ResponseEmitter, env cmds.Environment) error {
@@ -83,19 +85,26 @@ Output:
 		}
 
 		// Get file root nodes
-		var fileRootNodes []BlockNode
-		for _, c := range n.Pinning.RecursiveKeys() {
-			fileRootNode := &BlockNode{
+		api, err := cmdenv.GetApi(env, req)
+		if err != nil {
+			return err
+		}
+
+		pinKeys := n.Pinning.RecursiveKeys()
+
+		fileRootNodes := make([]BlockNode, len(pinKeys))
+		for i, c := range pinKeys {
+			fileRootNode := BlockNode{
 				Hash: c.String(),
 			}
 
-			err = recursiveFillNode(fileRootNode)
+			err = recursiveFillNode(&fileRootNode, api, req)
 
 			if err != nil {
 				return err
 			}
 
-			fileRootNodes = append(fileRootNodes, *fileRootNode)
+			fileRootNodes[i] = fileRootNode
 		}
 
 		// Output
@@ -140,6 +149,28 @@ Output:
 	},
 }
 
-func recursiveFillNode(node *BlockNode) error {
+func recursiveFillNode(node *BlockNode, api coreiface.CoreAPI, req *cmds.Request) error {
+	path := path.New(node.Hash)
+
+	rp, err := api.ResolvePath(req.Context, path)
+	if err != nil {
+		return err
+	}
+
+	links, err := api.Object().Links(req.Context, rp)
+	if err != nil {
+		return err
+	}
+
+	blockNodes := make([]BlockNode, len(links))
+
+	for i, link := range links {
+		blockNode := BlockNode{
+			Hash: link.Cid.String(),
+		}
+
+		blockNodes[i] = blockNode
+	}
+
 	return nil
 }
