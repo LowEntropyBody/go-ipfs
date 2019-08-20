@@ -32,10 +32,9 @@ please run the daemon:
 `
 
 type BlockNode struct {
-	Hash       string
-	Size       int64
-	BlockNodes []BlockNode
-	Data       string
+	BlockNodes       []BlockNode
+	Name, Hash, Data string
+	Size             uint64
 }
 
 type WorkOutput struct {
@@ -139,7 +138,6 @@ Output:
 		}
 
 		oldWorkOutput = newWorkOutput
-		testNodeToBlock()
 		return cmds.EmitOnce(res, newWorkOutput)
 	},
 	Type: &WorkOutput{},
@@ -208,45 +206,38 @@ func deserializeNode(nd *coreapi.Node) (*dag.ProtoNode, error) {
 func recursiveFillNode(node *BlockNode, api coreiface.CoreAPI, req *cmds.Request) error {
 	path := path.New(node.Hash)
 
-	rp, err := api.ResolvePath(req.Context, path)
+	nd, err := api.Object().Get(req.Context, path)
 	if err != nil {
 		return err
 	}
 
-	links, err := api.Object().Links(req.Context, rp)
+	r, err := api.Object().Data(req.Context, path)
 	if err != nil {
 		return err
 	}
 
-	if len(links) == 0 {
-		return nil
-	}
-
-	dataIO, err := api.Object().Data(req.Context, path)
+	data, err := ioutil.ReadAll(r)
 	if err != nil {
 		return err
 	}
 
-	data, err := ioutil.ReadAll(dataIO)
+	node.Size, err = nd.Size()
 	if err != nil {
 		return err
 	}
 
 	node.Data = string(data)
+	node.BlockNodes = make([]BlockNode, len(nd.Links()))
 
-	blockNodes := make([]BlockNode, len(links))
-
-	for i, link := range links {
+	for i, link := range nd.Links() {
 		blockNode := BlockNode{
 			Hash: link.Cid.String(),
 		}
 
 		recursiveFillNode(&blockNode, api, req)
 
-		blockNodes[i] = blockNode
+		node.BlockNodes[i] = blockNode
 	}
-
-	node.BlockNodes = blockNodes
 
 	return nil
 }
