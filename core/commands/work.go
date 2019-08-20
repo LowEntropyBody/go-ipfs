@@ -35,6 +35,7 @@ type BlockNode struct {
 	BlockNodes       []BlockNode
 	Name, Hash, Data string
 	Size             uint64
+	IsLeaf           bool
 }
 
 type WorkOutput struct {
@@ -211,6 +212,27 @@ func recursiveFillNode(node *BlockNode, api coreiface.CoreAPI, req *cmds.Request
 		return err
 	}
 
+	node.BlockNodes = make([]BlockNode, len(nd.Links()))
+	for i, link := range nd.Links() {
+		blockNode := BlockNode{
+			Hash: link.Cid.String(),
+		}
+
+		recursiveFillNode(&blockNode, api, req)
+
+		node.BlockNodes[i] = blockNode
+	}
+
+	node.Size, err = nd.Size()
+	if err != nil {
+		return err
+	}
+
+	if len(nd.Links()) == 0 {
+		node.IsLeaf = true
+		return nil
+	}
+
 	r, err := api.Object().Data(req.Context, path)
 	if err != nil {
 		return err
@@ -221,23 +243,7 @@ func recursiveFillNode(node *BlockNode, api coreiface.CoreAPI, req *cmds.Request
 		return err
 	}
 
-	node.Size, err = nd.Size()
-	if err != nil {
-		return err
-	}
-
 	node.Data = string(data)
-	node.BlockNodes = make([]BlockNode, len(nd.Links()))
-
-	for i, link := range nd.Links() {
-		blockNode := BlockNode{
-			Hash: link.Cid.String(),
-		}
-
-		recursiveFillNode(&blockNode, api, req)
-
-		node.BlockNodes[i] = blockNode
-	}
 
 	return nil
 }
