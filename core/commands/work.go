@@ -9,7 +9,10 @@ import (
 	"strings"
 	"text/tabwriter"
 
+	cid "github.com/ipfs/go-cid"
 	coreapi "github.com/ipfs/go-ipfs/core/coreapi"
+	ipld "github.com/ipfs/go-ipld-format"
+	dag "github.com/ipfs/go-merkledag"
 
 	bitswap "github.com/ipfs/go-bitswap"
 	cmds "github.com/ipfs/go-ipfs-cmds"
@@ -164,9 +167,12 @@ func testNodeToBlock() error {
 	decoder.DisallowUnknownFields()
 	decoder.Decode(node)
 
-	fmt.Println(node.Data)
+	dagnode, err := deserializeNode(node)
+	if err != nil {
+		return err
+	}
 
-	outString, err := json.Marshal(node)
+	outString, err := json.Marshal(dagnode)
 	if err != nil {
 		return err
 	}
@@ -174,6 +180,27 @@ func testNodeToBlock() error {
 	fmt.Println(string(outString))
 
 	return nil
+}
+
+func deserializeNode(nd *coreapi.Node) (*dag.ProtoNode, error) {
+	dagnode := new(dag.ProtoNode)
+	dagnode.SetData([]byte(nd.Data))
+
+	links := make([]*ipld.Link, len(nd.Links))
+	for i, link := range nd.Links {
+		c, err := cid.Decode(link.Hash)
+		if err != nil {
+			return nil, err
+		}
+		links[i] = &ipld.Link{
+			Name: link.Name,
+			Size: link.Size,
+			Cid:  c,
+		}
+	}
+	dagnode.SetLinks(links)
+
+	return dagnode, nil
 }
 
 func recursiveFillNode(node *BlockNode, api coreiface.CoreAPI, req *cmds.Request) error {
