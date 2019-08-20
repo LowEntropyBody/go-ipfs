@@ -179,7 +179,7 @@ func testNodeToBlock() error {
 
 	fmt.Println(string(outString))
 	fmt.Println(dagnode.Cid())
-	fmt.Println(dagnode.RawData())
+	fmt.Println(string(dagnode.RawData()))
 
 	return nil
 }
