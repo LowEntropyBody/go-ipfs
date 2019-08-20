@@ -171,7 +171,7 @@ func testNodeToBlock() error {
 		return err
 	}
 
-	fmt.Println(outString)
+	fmt.Println(string(outString))
 
 	return nil
 }
