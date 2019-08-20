@@ -178,6 +178,7 @@ func testNodeToBlock() error {
 	}
 
 	fmt.Println(string(outString))
+	fmt.Println(dagnode.Cid())
 
 	return nil
 }
