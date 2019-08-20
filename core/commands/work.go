@@ -14,11 +14,8 @@ import (
 	ipld "github.com/ipfs/go-ipld-format"
 	dag "github.com/ipfs/go-merkledag"
 
-	bitswap "github.com/ipfs/go-bitswap"
 	cmds "github.com/ipfs/go-ipfs-cmds"
 	"github.com/ipfs/go-ipfs/core/commands/cmdenv"
-	e "github.com/ipfs/go-ipfs/core/commands/e"
-	corerepo "github.com/ipfs/go-ipfs/core/corerepo"
 	coreiface "github.com/ipfs/interface-go-ipfs-core"
 	path "github.com/ipfs/interface-go-ipfs-core/path"
 )
@@ -31,20 +28,15 @@ please run the daemon:
     ipfs work
 `
 
-type BlockNode struct {
-	BlockNodes       []BlockNode
+type Node struct {
+	Children         []Node
 	Name, Hash, Data string
 	Size             uint64
 	IsLeaf           bool
 }
 
 type WorkOutput struct {
-	RepoSize          int64
-	DeltaRepoSize     int64
-	SendDataSize      int64
-	DeltaSendDataSize int64
-	FileRootNodes     []BlockNode
-	WorkLoad          int64
+	FileRootNodes []Node
 }
 
 var oldWorkOutput *WorkOutput
@@ -56,12 +48,7 @@ var WorkCmd = &cmds.Command{
 EXAMPLE:
 	ipfs work
 Output:
-	RepoSize           int Size in bytes that the repo is currently taking.
-	DeltaRepoSize      int Size in bytes that the change of repo size
-	SendDataSize       int Size in bytes that the node upload.
-	DeltaSendDataSize  int Size in bytes that the change of send data size
-	FileRootNodes      File root node collection
-	WorkLoad           int Workload score = sum(Files size)
+    FileRootNodes        File root node collection
 `,
 	},
 	Run: func(req *cmds.Request, res cmds.ResponseEmitter, env cmds.Environment) error {
@@ -75,23 +62,6 @@ Output:
 			return errors.New(offlineWorkErrorMessage)
 		}
 
-		// Repo info
-		repoStat, err := corerepo.RepoStat(req.Context, n)
-		if err != nil {
-			return err
-		}
-
-		// Bitswap info
-		bs, ok := n.Exchange.(*bitswap.Bitswap)
-		if !ok {
-			return e.TypeErr(bs, n.Exchange)
-		}
-
-		bitswapStat, err := bs.Stat()
-		if err != nil {
-			return err
-		}
-
 		// Get file root nodes
 		api, err := cmdenv.GetApi(env, req)
 		if err != nil {
@@ -99,47 +69,22 @@ Output:
 		}
 
 		pinKeys := n.Pinning.RecursiveKeys()
-
-		fileRootNodes := make([]BlockNode, len(pinKeys))
+		fileRootNodes := make([]Node, len(pinKeys))
 		for i, c := range pinKeys {
-			fileRootNode := BlockNode{
+			fileRootNodes[i] = Node{
 				Hash: c.String(),
 			}
 
-			err = recursiveFillNode(&fileRootNode, api, req)
-
+			err = recursiveFillNode(&fileRootNodes[i], api, req)
 			if err != nil {
 				return err
 			}
-
-			fileRootNodes[i] = fileRootNode
 		}
 
 		// Output
-		if oldWorkOutput == nil {
-			oldWorkOutput = &WorkOutput{
-				RepoSize:          int64(repoStat.RepoSize),
-				DeltaRepoSize:     0,
-				SendDataSize:      int64(bitswapStat.DataSent),
-				DeltaSendDataSize: 0,
-				FileRootNodes:     fileRootNodes,
-				WorkLoad:          int64(repoStat.RepoSize),
-			}
-
-			return cmds.EmitOnce(res, oldWorkOutput)
-		}
-
-		newWorkOutput := &WorkOutput{
-			RepoSize:          int64(repoStat.RepoSize),
-			DeltaRepoSize:     int64(repoStat.RepoSize) - oldWorkOutput.RepoSize,
-			SendDataSize:      int64(bitswapStat.DataSent),
-			DeltaSendDataSize: int64(bitswapStat.DataSent) - oldWorkOutput.SendDataSize,
-			FileRootNodes:     fileRootNodes,
-			WorkLoad:          int64(repoStat.RepoSize) + 5*((int64(repoStat.RepoSize)-oldWorkOutput.RepoSize)+(int64(bitswapStat.DataSent)-oldWorkOutput.SendDataSize)),
-		}
-
-		oldWorkOutput = newWorkOutput
-		return cmds.EmitOnce(res, newWorkOutput)
+		return cmds.EmitOnce(res, &WorkOutput{
+			FileRootNodes: fileRootNodes,
+		})
 	},
 	Type: &WorkOutput{},
 	Encoders: cmds.EncoderMap{
@@ -158,6 +103,49 @@ Output:
 	},
 }
 
+func recursiveFillNode(node *Node, api coreiface.CoreAPI, req *cmds.Request) error {
+	path := path.New(node.Hash)
+
+	nd, err := api.Object().Get(req.Context, path)
+	if err != nil {
+		return err
+	}
+
+	node.Children = make([]Node, len(nd.Links()))
+	for i, link := range nd.Links() {
+		node.Children[i] = Node{
+			Hash: link.Cid.String(),
+		}
+
+		recursiveFillNode(&node.Children[i], api, req)
+	}
+
+	node.Size, err = nd.Size()
+	if err != nil {
+		return err
+	}
+
+	if len(nd.Links()) == 0 {
+		node.IsLeaf = true
+		return nil
+	}
+
+	r, err := api.Object().Data(req.Context, path)
+	if err != nil {
+		return err
+	}
+
+	data, err := ioutil.ReadAll(r)
+	if err != nil {
+		return err
+	}
+
+	node.Data = string(data)
+
+	return nil
+}
+
+// For future work
 func testNodeToBlock() error {
 	data := "{\"Data\": \"another\",\"Links\": [ {\"Name\": \"some link\",\"Hash\": \"QmXg9Pp2ytZ14xgmQjYEiHjVjMFXzCVVEcRTWJBmLgR39V\",\"Size\": 8} ]}"
 	node := new(coreapi.Node)
@@ -202,48 +190,4 @@ func deserializeNode(nd *coreapi.Node) (*dag.ProtoNode, error) {
 	dagnode.SetLinks(links)
 
 	return dagnode, nil
-}
-
-func recursiveFillNode(node *BlockNode, api coreiface.CoreAPI, req *cmds.Request) error {
-	path := path.New(node.Hash)
-
-	nd, err := api.Object().Get(req.Context, path)
-	if err != nil {
-		return err
-	}
-
-	node.BlockNodes = make([]BlockNode, len(nd.Links()))
-	for i, link := range nd.Links() {
-		blockNode := BlockNode{
-			Hash: link.Cid.String(),
-		}
-
-		recursiveFillNode(&blockNode, api, req)
-
-		node.BlockNodes[i] = blockNode
-	}
-
-	node.Size, err = nd.Size()
-	if err != nil {
-		return err
-	}
-
-	if len(nd.Links()) == 0 {
-		node.IsLeaf = true
-		return nil
-	}
-
-	r, err := api.Object().Data(req.Context, path)
-	if err != nil {
-		return err
-	}
-
-	data, err := ioutil.ReadAll(r)
-	if err != nil {
-		return err
-	}
-
-	node.Data = string(data)
-
-	return nil
 }
