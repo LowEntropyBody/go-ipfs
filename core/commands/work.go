@@ -164,6 +164,8 @@ func testNodeToBlock() error {
 	decoder.DisallowUnknownFields()
 	decoder.Decode(node)
 
+	fmt.Println(node.Data)
+
 	outString, err := json.Marshal(node)
 	if err != nil {
 		return err
