@@ -6,7 +6,10 @@ import (
 	"fmt"
 	"io"
 	"io/ioutil"
+	"strings"
 	"text/tabwriter"
+
+	coreapi "github.com/ipfs/go-ipfs/core/coreapi"
 
 	bitswap "github.com/ipfs/go-bitswap"
 	cmds "github.com/ipfs/go-ipfs-cmds"
@@ -133,6 +136,7 @@ Output:
 		}
 
 		oldWorkOutput = newWorkOutput
+		testNodeToBlock()
 		return cmds.EmitOnce(res, newWorkOutput)
 	},
 	Type: &WorkOutput{},
@@ -150,6 +154,24 @@ Output:
 			return nil
 		}),
 	},
+}
+
+func testNodeToBlock() error {
+	data := "{\"Data\": \"another\",\"Links\": [ {\"Name\": \"some link\",\"Hash\": \"QmXg9Pp2ytZ14xgmQjYEiHjVjMFXzCVVEcRTWJBmLgR39V\",\"Size\": 8} ]}"
+	node := new(coreapi.Node)
+	decoder := json.NewDecoder(strings.NewReader(data))
+
+	decoder.DisallowUnknownFields()
+	decoder.Decode(node)
+
+	outString, err := json.Marshal(*node)
+	if err != nil {
+		return err
+	}
+
+	fmt.Println(outString)
+
+	return nil
 }
 
 func recursiveFillNode(node *BlockNode, api coreiface.CoreAPI, req *cmds.Request) error {
