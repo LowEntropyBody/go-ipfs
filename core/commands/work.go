@@ -141,7 +141,7 @@ func recursiveFillNode(nodes map[string]Node, hash string, isRoot bool, api core
 	if err != nil {
 		return err
 	}
-
+	fmt.Println("4")
 	node.Size = stat.BlockSize
 
 	if stat.NumLinks == 0 {
@@ -158,7 +158,7 @@ func recursiveFillNode(nodes map[string]Node, hash string, isRoot bool, api core
 	if err != nil {
 		return err
 	}
-
+	fmt.Println("5")
 	node.Data = string(data)
 	nodes[hash] = node
 	return nil
