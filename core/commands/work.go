@@ -113,8 +113,6 @@ func recursiveFillNode(nodes map[string]Node, hash string, isRoot bool, api core
 		return nil
 	}
 
-	fmt.Println("1")
-
 	path := path.New(hash)
 
 	nd, err := api.Object().Get(req.Context, path)
@@ -122,26 +120,22 @@ func recursiveFillNode(nodes map[string]Node, hash string, isRoot bool, api core
 		return err
 	}
 
-	fmt.Println("2")
-
 	node := Node{
 		Hash:   hash,
 		IsRoot: isRoot,
 		Links:  make([]string, len(nd.Links())),
 	}
 
-	fmt.Println("3")
-
 	for i, link := range nd.Links() {
 		node.Links[i] = link.Cid.String()
-		// recursiveFillNode(nodes, link.Cid.String(), false, api, req)
+		recursiveFillNode(nodes, link.Cid.String(), false, api, req)
 	}
 
 	stat, err := nd.Stat()
 	if err != nil {
 		return err
 	}
-	fmt.Println("4")
+
 	node.Size = stat.BlockSize
 
 	if stat.NumLinks == 0 {
@@ -158,11 +152,9 @@ func recursiveFillNode(nodes map[string]Node, hash string, isRoot bool, api core
 	if err != nil {
 		return err
 	}
-	fmt.Println("5")
+
 	node.Data = string(data)
-	fmt.Println("5.5")
 	nodes[hash] = node
-	fmt.Println("6")
 	return nil
 }
 
