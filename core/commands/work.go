@@ -108,7 +108,6 @@ Output:
 }
 
 func recursiveFillNode(nodes map[string]Node, hash string, isRoot bool, api coreiface.CoreAPI, req *cmds.Request) error {
-	fmt.Println(hash)
 	if _, ok := nodes[hash]; ok {
 		return nil
 	}
