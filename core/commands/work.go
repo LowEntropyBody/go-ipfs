@@ -29,14 +29,17 @@ please run the daemon:
 `
 
 type Node struct {
-	Children         []Node
-	Name, Hash, Data string
-	Size             uint64
-	IsLeaf           bool
+	Hash   string
+	Links  []string
+	Name   string
+	Data   string
+	Size   int
+	IsLeaf bool
+	IsRoot bool
 }
 
 type WorkOutput struct {
-	FileRootNodes []Node
+	Nodes []Node
 }
 
 var oldWorkOutput *WorkOutput
@@ -48,7 +51,7 @@ var WorkCmd = &cmds.Command{
 EXAMPLE:
 	ipfs work
 Output:
-    FileRootNodes        File root node collection
+    Nodes        Node collection
 `,
 	},
 	Run: func(req *cmds.Request, res cmds.ResponseEmitter, env cmds.Environment) error {
@@ -68,22 +71,23 @@ Output:
 			return err
 		}
 
-		pinKeys := n.Pinning.RecursiveKeys()
-		fileRootNodes := make([]Node, len(pinKeys))
-		for i, c := range pinKeys {
-			fileRootNodes[i] = Node{
-				Hash: c.String(),
-			}
+		var nodes map[string]Node
 
-			err = recursiveFillNode(&fileRootNodes[i], api, req)
+		for _, key := range n.Pinning.RecursiveKeys() {
+			recursiveFillNode(nodes, key.String(), true, api, req)
 			if err != nil {
 				return err
 			}
 		}
 
 		// Output
+		nodeValues := make([]Node, len(nodes))
+		for _, value := range nodes {
+			nodeValues = append(nodeValues, value)
+		}
+
 		return cmds.EmitOnce(res, &WorkOutput{
-			FileRootNodes: fileRootNodes,
+			Nodes: nodeValues,
 		})
 	},
 	Type: &WorkOutput{},
@@ -103,7 +107,16 @@ Output:
 	},
 }
 
-func recursiveFillNode(node *Node, api coreiface.CoreAPI, req *cmds.Request) error {
+func recursiveFillNode(nodes map[string]Node, hash string, isRoot bool, api coreiface.CoreAPI, req *cmds.Request) error {
+	if _, ok := nodes[hash]; ok {
+		return nil
+	}
+
+	node := Node{
+		Hash:   hash,
+		IsRoot: isRoot,
+	}
+
 	path := path.New(node.Hash)
 
 	nd, err := api.Object().Get(req.Context, path)
@@ -111,21 +124,20 @@ func recursiveFillNode(node *Node, api coreiface.CoreAPI, req *cmds.Request) err
 		return err
 	}
 
-	node.Children = make([]Node, len(nd.Links()))
+	node.Links = make([]string, len(nd.Links()))
 	for i, link := range nd.Links() {
-		node.Children[i] = Node{
-			Hash: link.Cid.String(),
-		}
-
-		recursiveFillNode(&node.Children[i], api, req)
+		node.Links[i] = link.Cid.String()
+		recursiveFillNode(nodes, link.Cid.String(), false, api, req)
 	}
 
-	node.Size, err = nd.Size()
+	stat, err := nd.Stat()
 	if err != nil {
 		return err
 	}
 
-	if len(nd.Links()) == 0 {
+	node.Size = stat.BlockSize
+
+	if stat.NumLinks == 0 {
 		node.IsLeaf = true
 		return nil
 	}
@@ -141,7 +153,7 @@ func recursiveFillNode(node *Node, api coreiface.CoreAPI, req *cmds.Request) err
 	}
 
 	node.Data = string(data)
-
+	nodes[hash] = node
 	return nil
 }
 
