@@ -74,6 +74,7 @@ Output:
 		var nodes map[string]Node
 
 		for _, key := range n.Pinning.RecursiveKeys() {
+			fmt.Println(key.String())
 			recursiveFillNode(nodes, key.String(), true, api, req)
 			if err != nil {
 				return err
@@ -112,22 +113,22 @@ func recursiveFillNode(nodes map[string]Node, hash string, isRoot bool, api core
 		return nil
 	}
 
-	node := Node{
-		Hash:   hash,
-		IsRoot: isRoot,
-	}
-
-	path := path.New(node.Hash)
+	path := path.New(hash)
 
 	nd, err := api.Object().Get(req.Context, path)
 	if err != nil {
 		return err
 	}
 
-	node.Links = make([]string, len(nd.Links()))
+	node := Node{
+		Hash:   hash,
+		IsRoot: isRoot,
+		Links:  make([]string, len(nd.Links())),
+	}
+
 	for i, link := range nd.Links() {
 		node.Links[i] = link.Cid.String()
-		recursiveFillNode(nodes, link.Cid.String(), false, api, req)
+		// recursiveFillNode(nodes, link.Cid.String(), false, api, req)
 	}
 
 	stat, err := nd.Stat()
