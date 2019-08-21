@@ -140,6 +140,7 @@ func recursiveFillNode(nodes map[string]Node, hash string, isRoot bool, api core
 
 	if stat.NumLinks == 0 {
 		node.IsLeaf = true
+		nodes[hash] = node
 		return nil
 	}
 
@@ -154,7 +155,6 @@ func recursiveFillNode(nodes map[string]Node, hash string, isRoot bool, api core
 	}
 
 	node.Data = string(data)
-	nodes[hash] = node
 	return nil
 }
 
