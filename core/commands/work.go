@@ -81,7 +81,7 @@ Output:
 		}
 
 		// Output
-		nodeValues := make([]Node, len(nodes))
+		var nodeValues []Node
 		for _, value := range nodes {
 			nodeValues = append(nodeValues, value)
 		}
@@ -161,6 +161,7 @@ func recursiveFillNode(nodes map[string]Node, hash string, isRoot bool, api core
 	fmt.Println("5")
 	node.Data = string(data)
 	nodes[hash] = node
+	fmt.Println("6")
 	return nil
 }
 
