@@ -34,8 +34,8 @@ type Node struct {
 	Name   string
 	Data   string
 	Size   int
-	IsLeaf bool
-	IsRoot bool
+	IsLeaf int
+	IsRoot int
 }
 
 type WorkOutput struct {
@@ -74,7 +74,7 @@ Output:
 		nodes := make(map[string]Node)
 
 		for _, key := range n.Pinning.RecursiveKeys() {
-			recursiveFillNode(nodes, key.String(), true, api, req)
+			recursiveFillNode(nodes, key.String(), 1, api, req)
 			if err != nil {
 				return err
 			}
@@ -107,7 +107,7 @@ Output:
 	},
 }
 
-func recursiveFillNode(nodes map[string]Node, hash string, isRoot bool, api coreiface.CoreAPI, req *cmds.Request) error {
+func recursiveFillNode(nodes map[string]Node, hash string, isRoot int, api coreiface.CoreAPI, req *cmds.Request) error {
 	if _, ok := nodes[hash]; ok {
 		return nil
 	}
@@ -122,12 +122,13 @@ func recursiveFillNode(nodes map[string]Node, hash string, isRoot bool, api core
 	node := Node{
 		Hash:   hash,
 		IsRoot: isRoot,
+		IsLeaf: 0,
 		Links:  make([]string, len(nd.Links())),
 	}
 
 	for i, link := range nd.Links() {
 		node.Links[i] = link.Cid.String()
-		recursiveFillNode(nodes, link.Cid.String(), false, api, req)
+		recursiveFillNode(nodes, link.Cid.String(), 0, api, req)
 	}
 
 	stat, err := nd.Stat()
@@ -138,7 +139,7 @@ func recursiveFillNode(nodes map[string]Node, hash string, isRoot bool, api core
 	node.Size = stat.BlockSize
 
 	if stat.NumLinks == 0 {
-		node.IsLeaf = true
+		node.IsLeaf = 1
 		nodes[hash] = node
 		return nil
 	}
